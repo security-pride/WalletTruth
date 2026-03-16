@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Send Transaction on Sepolia</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3/dist/web3.min.js"></script>
+</head>
+<body>
+    <h1>Sign Message with Inconsistent ChainID</h1>
+    <button id="connectWallet">Connect Wallet</button>
+    <button id="signEIP712Transaction">Send Transaction</button>
+
+    <script type="module">
+        import gen_typedData from './gen_typedData.js';
+        let ac
+        let web3
+        let provider
+
+        const contractAddress = "0xb596ed2A9edEE1F2300bC4Fe8AD809c16a42b407";
+        const verifyNum = '1036693101413695081182157213613146435511671501831';
+        const verifyContract = contractAddress
+        
+        if (typeof window.ethereum !== 'undefined') {
+            web3 = new Web3(window.ethereum)
+            if (typeof window.ethereum.providers !== 'undefined' && window.ethereum.providers?.length) {
+                window.ethereum.providers.forEach(async (p) => {
+                    if (p.isMetaMask || p.isCoinbaseWallet) {
+                        console.log("coinbase injected")
+                        provider = p;
+                    }
+                });
+            }
+        } else if (typeof window.sender !== 'undefined' && typeof window.sender.ethereum !== 'undefined') {
+            web3 = new Web3(window.sender.ethereum);
+            console.log("web3 provider = sender wallet")
+        } else {
+            console.log("no web3 provider")
+            web3 = new Web3(window.ethereum)
+            console.log(window)
+        }
+
+        async function connectWallet() {
+            try {
+                if (typeof window.sender !== 'undefined') {
+                    ac = await sender.ethereum.request({ method: 'eth_requestAccounts' });
+                } else {
+                    ac = await window.ethereum.request({ method: 'eth_requestAccounts' }, provider);
+                }
+                return ac
+            } catch (error) {
+                console.error('no accounts');
+                throw error;
+            }
+        }
+
+        async function signEIP712Transaction() {
+            try {
+                const userAccount = (await web3.eth.getAccounts())[0];
+
+                const chainId = await web3.eth.getChainId()
+                console.log("current connected chainID:", chainId.toString())
+                const typedData = await gen_typedData(43114, verifyNum)        
+                console.log("typed data to sign: ", typedData)
+
+                // curl -X POST --data '{"jsonrpc":"2.0","method":"eth_signTypedData","params":["0x64D0F426722E04d605e903A03702b6b6F8913fB2", {"types":{"EIP712Domain":[{"name":"name","type":"string"},{"name":"version","type":"string"},{"name":"chainId","type":"uint256"},{"name":"verifyingContract","type":"address"}],"Person":[{"name":"name","type":"string"},{"name":"wallet","type":"address"}],"Mail":[{"name":"from","type":"Person"},{"name":"to","type":"Person"},{"name":"contents","type":"string"}]},"primaryType":"Mail","domain":{"name":"Ether Mail","version":"1","chainId":1,"verifyingContract":"0xae7ab96520de3a18e5e111b5eaab095312d7fe84"},"message":{"from":{"name":"Cow","wallet":"0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826"},"to":{"name":"Bob","wallet":"0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB"},"contents":"Hello, Bob!"}}],"id":1}'
+                const sig = await window.sender.ethereum.request({
+                method: "eth_signTypedData_v4",
+                params: [
+                    userAccount, 
+                    JSON.stringify(typedData)
+                ]
+                })
+                
+                console.log(sig)
+                console.log('EIP-712 transaction signed successfully!');
+            } catch (error) {
+                console.error('Error signing or executing EIP-712 transaction:', error);
+            }
+        }
+
+    document.getElementById('signEIP712Transaction').addEventListener('click', signEIP712Transaction);
+    </script>
+</body>
+</html>
